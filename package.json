@@ -1,6 +1,6 @@
 {
   "name": "makerbot-rpc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Interact with your MakerBot printers through node.js",
   "main": "index.js",
   "scripts": {
@@ -9,6 +9,10 @@
   "keywords": [],
   "author": "TJ Horner <me@tjhorner.com>",
   "license": "GPLv3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tjhorner/node-makerbot-rpc"
+  },
   "dependencies": {
     "crc": "^3.4.4",
     "request": "^2.81.0"
