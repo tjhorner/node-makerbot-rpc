@@ -10,6 +10,10 @@ This library acts as an abstraction layer for the JSON-RPC methods that MakerBot
 - **Cancel current process.** You can instruct your printer to cancel the current process (unloading/loading filament, printing, assisted calibration, etc.)
 - **Print a file.** You can instruct your printer to print a `.makerbot` file remotely.
 
+## Projects using this library
+
+- [MakerBot WebUI](https://github.com/tjhorner/MakerbotWebUI)
+
 ## Example
 
 ```javascript

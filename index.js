@@ -163,7 +163,7 @@ class MakerbotRpcClient extends EventEmitter {
   }
 
   getMachineConfig() {
-    return this.client.request("get_machine_config", { })
+    return this.client.request("get_machine_config")
   }
 
   loadFilament(tool_index = 0) {
@@ -175,7 +175,7 @@ class MakerbotRpcClient extends EventEmitter {
   }
 
   cancel() {
-    return this.client.request("cancel", { })
+    return this.client.request("cancel")
   }
 
   printFile(file) {
