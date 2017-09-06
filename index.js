@@ -3,6 +3,7 @@ const request = require('request')
 const JsonRpc = require('./lib/jsonrpc')
 const fs = require('fs')
 const crc = require('crc')
+const path = require('path')
 
 // MakerBot Reflector address, for remote access
 const REFLECTOR_BASE = "https://reflector.makerbot.com"
@@ -179,11 +180,14 @@ class MakerbotRpcClient extends EventEmitter {
   }
 
   printFile(file) {
+    // TODO what's the max length of the file name?
+    var filename = path.parse(file).base
+
     // TODO handle errors in this promise
     return new Promise((resolve, reject) => {
       fs.readFile(file, (err, data) => {
         this.client.request("print", {
-          filepath: "print.makerbot",
+          filepath: filename,
           transfer_wait: true
         })
         .then(res => {
@@ -194,10 +198,11 @@ class MakerbotRpcClient extends EventEmitter {
           this.client.request("process_method", {
             method: "build_plate_cleared"
           })
+
           return this.client.request("put_init", {
             block_size: data.length,
             file_id: "1",
-            file_path: "/current_thing/print.makerbot",
+            file_path: `/current_thing/${filename}`,
             length: data.length
           })
         })
