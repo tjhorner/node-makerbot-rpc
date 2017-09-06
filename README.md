@@ -1,10 +1,14 @@
 # MakerBot JSON-RPC Library for Node.js
 
-(Before you go any further, note that **THIS LIBRARY IS SUPER INCOMPLETE** and will be updated fairly often. So before you complain about something that's missing, **DON'T.**)
+## THIS LIBRARY GRADUATED TO 1.0.0!
+
+With every new feature comes breaking changes. [See here](https://github.com/tjhorner/node-makerbot-rpc/releases/tag/v1.0.0) for more info.
 
 This library acts as an abstraction layer for the JSON-RPC methods that MakerBot 3D printers use. At the moment, it supports doing the following:
 
 - **Authentication.** You can authenticate with a Thingiverse OAuth token or locally by pressing on the knob.
+- **Remote control.** Control a printer remotely with a Thingiverse token and the printer's ID.
+- **Get realtime camera stream (experimental).** Get the realtime camera stream out of the printer.
 - **Get realtime printer status.** You can get the real-time status of the printer (what it's doing, info about the extruder, and much more).
 - **Load/unload filament.** You can instruct your printer to start the filament loading/unloading process.
 - **Cancel current process.** You can instruct your printer to cancel the current process (unloading/loading filament, printing, assisted calibration, etc.)
@@ -18,33 +22,37 @@ This library acts as an abstraction layer for the JSON-RPC methods that MakerBot
 
 ```javascript
 const MakerbotRpc = require('makerbot-rpc')
+const fs = require('fs')
 
-var printer = new MakerbotRpc("192.168.1.100", {
-  authMethod: "thingiverse",
-  thingiverseToken: "asdasd123123",
-  username: "tjhorner"
+var printer = new MakerbotRpc({
+  authMethod: "reflector",
+  accessToken: "thingiverseAccessToken",
+  printerId: "yourPrinterId"
 })
 
-// Fired when the initial handshake with the printer is made
-printer.on("connected", info => {
-  console.log("We are connected to the printer!", info)
+printer.on("connected", printerInfo => {
+  console.log(`Connected to ${printerInfo.machine_name}, attempting authentication`)
 })
 
-// Fired when authentication is successful, and you can now
-// make privileged method calls
-printer.on("authenticated", () => {
-  console.log("We're now authenticated. Hooray!")
-  // Print the file hello.makerbot
-  printer.printFile(__dirname + "/hello.makerbot")
-    .then(printInfo => {
-      console.log("We have started printing! Here is some info about the print:", printInfo)
-    })
+printer.on("connect-error", err => {
+  console.log("error connecting!", err)
 })
 
-// Fired when the printer sends a `system_notification` around
-// every one second. It includes lots of useful stuff, and is
-// stored in `MakerbotRpc.state` if you ever need it later
-printer.on("state", newState => {
-  console.log("The printer sent us a new state!", newState)
+printer.on("auth-push-knob", () => {
+  console.log("To finish authentication, press the knob on your printer.")
+})
+
+printer.on("authenticated", res => {
+  console.log("Authenticated!")
+  printer.startCameraStream()
+})
+
+printer.on("camera-frame", frame => {
+  printer.endCameraStream()
+  fs.writeFile("testimg/test.jpg", frame, () => { })
+})
+
+printer.on("state", notif => {
+  console.log(printer.state)
 })
 ```

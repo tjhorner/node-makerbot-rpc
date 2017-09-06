@@ -1,12 +1,14 @@
 const MakerbotRpc = require('..')
-const config = require('./testconfig.json')
+const fs = require('fs')
+const config = require('./reflectortestconfig.json')
 
-var printer = new MakerbotRpc(config.ip, {
-  authMethod: "thingiverse",
-  thingiverseToken: config.token,
-  username: config.username,
-  port: 9001
+var printer = new MakerbotRpc({
+  authMethod: "reflector",
+  accessToken: config.accessToken,
+  printerId: config.printerId
 })
+
+console.log(`Attempting to connect to ${config.printerId}...`)
 
 printer.on("connected", printerInfo => {
   console.log(`Connected to ${printerInfo.machine_name}, attempting authentication`)
@@ -22,7 +24,13 @@ printer.on("auth-push-knob", () => {
 
 printer.on("authenticated", res => {
   console.log("Authenticated!")
-  printer.printFile(__dirname + "/mei.makerbot")
+  // printer.printFile(__dirname + "/mei.makerbot")
+  printer.startCameraStream()
+})
+
+printer.on("camera-frame", frame => {
+  printer.endCameraStream()
+  fs.writeFile("testimg/test.jpg", frame, () => { })
 })
 
 printer.on("state", notif => {

@@ -3,9 +3,7 @@ const request = require('request')
 const JsonRpc = require('./lib/jsonrpc')
 const fs = require('fs')
 const crc = require('crc')
-
-// MakerBot Reflector address, for remote access
-const REFLECTOR_BASE = "https://reflector.makerbot.com"
+const Reflector = require('makerbot')
 
 // Client ID/secret, for LAN access
 const AUTH_CLIENT_ID = "MakerWare"
@@ -18,13 +16,94 @@ const AUTH_CLIENT_SECRET = "secret"
  * @extends {EventEmitter}
  */
 class MakerbotRpcClient extends EventEmitter {
-  constructor(printerIp, options = { }) {
+  constructor(options = { }) {
     super()
 
-    this.printerIp = printerIp
     this.connected = false
 
-    this.client = new JsonRpc(printerIp, 9999)
+    if(options.authMethod === "reflector")
+      this._initReflector(options)
+    else
+      this._initLocal(options)
+  }
+
+  /**
+   * Initialize a connection with the printer remotely via MakerBot Reflector.
+   * 
+   * @param {any} options 
+   * 
+   * @memberOf MakerbotRpcClient
+   */
+  _initReflector(options) {
+    this.reflector = new Reflector(options.accessToken)
+
+    this.reflector.callPrinter(options.printerId)
+      .then(res => {
+        if(res.call) {
+          return res.call
+        } else {
+          this.emit("connect-error", res)
+        }
+      })
+      .catch(err => this.emit("connect-error", err))
+      .then(res => {
+        var ip = res.relay.split(":")[0]
+        var port = parseInt(res.relay.split(":")[1])
+
+        this.client = new JsonRpc(ip, port)
+
+        return this.client.request("auth_packet", {
+          call_id: res.id,
+          client_code: res.client_code,
+          printer_id: options.printerId
+        })
+      })
+      .then(res => {
+        if(res && res.result === true)
+          return true
+        else
+          this.emit("connect-error")
+      })
+      .catch(err => this.emit("connect-error", err))
+      .then(connResult => {
+        return this.client.request("handshake", { })
+      })
+      .then(handshakeRes => {
+        if(handshakeRes.result) {
+          this.client.on("response", res => {
+            // console.log("Sys notif", res)
+            if(res.method === "system_notification") {
+              this.state = res.params.info
+              this.emit("state", res)
+            }
+          })
+
+          this.client.on("binary-data", data => {
+            this.emit("camera-frame", data)
+          })
+
+          this.client.on("disconnected", () => {
+            this.connected = false
+            this.emit("disconnected")
+          })
+
+          this.emit("connected", handshakeRes.result)
+          this.emit("authenticated")
+        } else {
+          this.emit("connect-error", handshakeRes)
+        }
+      })
+  }
+
+  /**
+   * Initialize a connection with the printer via LAN.
+   * 
+   * @param {any} options 
+   * 
+   * @memberOf MakerbotRpcClient
+   */
+  _initLocal(options) {
+    this.client = new JsonRpc(options.ip, options.port || 9999)
 
     this.client.on("response", res => {
       if(res.method === "system_notification") {
@@ -32,11 +111,15 @@ class MakerbotRpcClient extends EventEmitter {
         this.emit("state", res)
       }
     })
-    
-    // this.client.request("handshake", { })
-    //   .then(res => {
-    //     console.log("HANDSHAKE", res)
-    //   })
+
+    this.client.on("binary-data", data => {
+      this.emit("camera-frame", data)
+    })
+
+    this.client.on("disconnected", () => {
+      this.connected = false
+      this.emit("disconnected")
+    })
 
     this.client.request("handshake", { })
       .then(res => {
@@ -166,6 +249,10 @@ class MakerbotRpcClient extends EventEmitter {
     return this.client.request("get_machine_config")
   }
 
+  changeMachineName(machine_name) {
+    return this.client.request("change_machine_name", { machine_name })
+  }
+
   loadFilament(tool_index = 0) {
     return this.client.request("load_filament", { tool_index })
   }
@@ -176,6 +263,15 @@ class MakerbotRpcClient extends EventEmitter {
 
   cancel() {
     return this.client.request("cancel")
+  }
+
+  startCameraStream() {
+    console.warn("!!! GETTING CAMERA DATA IS HIGHLY EXPERIMENTAL AND NOT PRODUCTION READY !!!\nYOU HAVE BEEN WARNED!")
+    return this.client.request("request_camera_stream", { })
+  }
+
+  endCameraStream() {
+    return this.client.request("end_camera_stream", { })
   }
 
   printFile(file) {
