@@ -25,12 +25,18 @@ printer.on("auth-push-knob", () => {
 printer.on("authenticated", res => {
   console.log("Authenticated!")
   // printer.printFile(__dirname + "/mei.makerbot")
-  printer.startCameraStream()
+  // printer.startCameraStream()
+  printer.getSingleCameraFrame()
+    .then(frame => {
+      fs.writeFile("testimg/test.jpg", frame, () => { })
+      console.log(frame)
+    })
 })
 
 printer.on("camera-frame", frame => {
-  printer.endCameraStream()
-  fs.writeFile("testimg/test.jpg", frame, () => { })
+  console.log("Got frame")
+  // printer.endCameraStream()
+  // fs.writeFile("testimg/test.jpg", frame, () => { })
 })
 
 printer.on("state", notif => {

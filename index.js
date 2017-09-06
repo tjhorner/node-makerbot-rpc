@@ -272,7 +272,19 @@ class MakerbotRpcClient extends EventEmitter {
   }
 
   endCameraStream() {
+    // this.client.flushMemory()
     return this.client.request("end_camera_stream", { })
+  }
+
+  getSingleCameraFrame() {
+    return new Promise((resolve, reject) => {
+      this.client.once("binary-data", data => {
+        this.endCameraStream()
+        resolve(data)
+      })
+
+      this.startCameraStream()
+    })
   }
 
   printFile(file) {
