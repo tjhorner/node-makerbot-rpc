@@ -324,6 +324,9 @@ class MakerbotRpcClient extends EventEmitter {
         length: this.currentPrintByteLength
       })
         .then(res => {
+          this.currentPrintBuffers = [ ]
+          this.currentPrintByteLength = 0
+          this.currentPrintCrc32 = ""
           // console.log("put_term res", res)
         })
     } else {
