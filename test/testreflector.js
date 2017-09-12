@@ -26,11 +26,11 @@ printer.on("authenticated", res => {
   console.log("Authenticated!")
   // printer.printFile(__dirname + "/mei.makerbot")
   // printer.startCameraStream()
-  printer.getSingleCameraFrame()
-    .then(frame => {
-      fs.writeFile("testimg/test.jpg", frame, () => { })
-      console.log(frame)
-    })
+  // printer.getSingleCameraFrame()
+  //   .then(frame => {
+  //     fs.writeFile("testimg/test.jpg", frame, () => { })
+  //     console.log(frame)
+  //   })
 })
 
 printer.on("camera-frame", frame => {

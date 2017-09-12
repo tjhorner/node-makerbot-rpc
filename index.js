@@ -21,11 +21,58 @@ class MakerbotRpcClient extends EventEmitter {
     super()
 
     this.connected = false
+    this.autoRescue = options.autoRescue || false
 
+    this._connect(options)
+  }
+
+  _connect(options) {
     if(options.authMethod === "reflector")
       this._initReflector(options)
     else
       this._initLocal(options)
+  }
+
+  _setupConnection(options) {
+    // Set up autorescue
+    if(this.autoRescue) {
+      this.client.conn.on("timeout", () => {
+        this.emit("timeout")
+        
+        this.client.conn.end()
+        this.client.conn.destroy()
+
+        this.connected = false
+        this.emit("disconnected")
+        this._connect(options)
+      })
+
+      this.client.conn.on("close", err => {
+        // only reconnect in case of connection error
+        if(err) {
+          this.connected = false
+          this.emit("disconnected")
+          this._connect(options)
+        }
+      })
+    }
+    
+    this.client.on("response", res => {
+      // console.log("Sys notif", res)
+      if(res.method === "system_notification") {
+        this.state = res.params.info
+        this.emit("state", res)
+      }
+    })
+
+    this.client.on("binary-data", data => {
+      this.emit("camera-frame", data)
+    })
+
+    this.client.on("disconnected", () => {
+      this.connected = false
+      this.emit("disconnected")
+    })
   }
 
   /**
@@ -52,6 +99,7 @@ class MakerbotRpcClient extends EventEmitter {
         var port = parseInt(res.relay.split(":")[1])
 
         this.client = new JsonRpc(ip, port)
+        this._setupConnection(options)
 
         return this.client.request("auth_packet", {
           call_id: res.id,
@@ -71,23 +119,6 @@ class MakerbotRpcClient extends EventEmitter {
       })
       .then(handshakeRes => {
         if(handshakeRes.result) {
-          this.client.on("response", res => {
-            // console.log("Sys notif", res)
-            if(res.method === "system_notification") {
-              this.state = res.params.info
-              this.emit("state", res)
-            }
-          })
-
-          this.client.on("binary-data", data => {
-            this.emit("camera-frame", data)
-          })
-
-          this.client.on("disconnected", () => {
-            this.connected = false
-            this.emit("disconnected")
-          })
-
           this.emit("connected", handshakeRes.result)
           this.emit("authenticated")
         } else {
@@ -105,22 +136,7 @@ class MakerbotRpcClient extends EventEmitter {
    */
   _initLocal(options) {
     this.client = new JsonRpc(options.ip, options.port || 9999)
-
-    this.client.on("response", res => {
-      if(res.method === "system_notification") {
-        this.state = res.params.info
-        this.emit("state", res)
-      }
-    })
-
-    this.client.on("binary-data", data => {
-      this.emit("camera-frame", data)
-    })
-
-    this.client.on("disconnected", () => {
-      this.connected = false
-      this.emit("disconnected")
-    })
+    this._setupConnection(options)
 
     this.client.request("handshake", { })
       .then(res => {
@@ -284,6 +300,16 @@ class MakerbotRpcClient extends EventEmitter {
       })
 
       this.startCameraStream()
+    })
+  }
+
+  printUrl(url) {
+    // TODO do we know if this works?
+    // I mean, technically it should, right?
+    return new Promise((resolve, reject) => {
+      this.client.request("print", {
+        filepath: url
+      }).catch(reject).then(resolve)
     })
   }
 
