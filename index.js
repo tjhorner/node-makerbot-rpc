@@ -68,7 +68,7 @@ class MakerbotRpcClient extends EventEmitter {
         if(!this.connected) {
           // apparently we didn't establish we are connected, even though we are
           this.connected = true
-          this.emit("connected", res)
+          this.emit("connected", res.params.info)
           this.emit("authenticated")
         }
       }
