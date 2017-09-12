@@ -5,6 +5,7 @@ const fs = require('fs')
 const crc = require('crc')
 const Reflector = require('makerbot')
 const path = require('path')
+const bufferSplit = require('node-split').split
 
 // Client ID/secret, for LAN access
 const AUTH_CLIENT_ID = "MakerWare"
@@ -21,8 +22,9 @@ class MakerbotRpcClient extends EventEmitter {
     super()
 
     this.connected = false
-    this.autoRescue = options.autoRescue || false
-
+    this.currentPrintBuffers = [ ]
+    this.currentPrintCrc32 = ""
+    this.currentPrintByteLength = 0
     this._connect(options)
   }
 
@@ -35,7 +37,7 @@ class MakerbotRpcClient extends EventEmitter {
 
   _setupConnection(options) {
     // Set up autorescue
-    if(this.autoRescue) {
+    if(options.autoRescue) {
       this.client.conn.on("timeout", () => {
         this.emit("timeout")
         
@@ -86,6 +88,7 @@ class MakerbotRpcClient extends EventEmitter {
     this.reflector = new Reflector(options.accessToken)
 
     this.reflector.callPrinter(options.printerId)
+      .catch(err => this.emit("connect-error", err))
       .then(res => {
         if(res.call) {
           return res.call
@@ -93,7 +96,6 @@ class MakerbotRpcClient extends EventEmitter {
           this.emit("connect-error", res)
         }
       })
-      .catch(err => this.emit("connect-error", err))
       .then(res => {
         var ip = res.relay.split(":")[0]
         var port = parseInt(res.relay.split(":")[1])
@@ -313,6 +315,73 @@ class MakerbotRpcClient extends EventEmitter {
     })
   }
 
+  sendPrintPart(index) {
+    if(index === this.currentPrintBuffers.length) {
+      // console.log("Done sending print!")
+      this.client.request("put_term", {
+        crc: this.currentPrintCrc32,
+        file_id: "1",
+        length: this.currentPrintByteLength
+      })
+        .then(res => {
+          // console.log("put_term res", res)
+        })
+    } else {
+      // console.log(`Sending print part ${index + 1}/${this.currentPrintBuffers.length}`)
+      this.client.request("put_raw", {
+        file_id: "1",
+        length: this.currentPrintBuffers[index].byteLength
+      })
+        .then(() => {
+          this.client.conn.write(this.currentPrintBuffers[index], () => {
+            // console.log(`Done with ${index + 1}/${this.currentPrintBuffers.length}`)
+            this.sendPrintPart(index + 1)
+          })
+        })
+    }
+  }
+
+  initPrint(data, filename) {
+    // Split the buffer into multiple pieces
+    bufferSplit(data, {
+      bytes: 50000
+    }, (err, buffers) => {
+      this.currentPrintBuffers = buffers
+      this.currentPrintByteLength = data.byteLength
+      this.currentPrintCrc32 = crc.crc32(data)
+
+      this.client.request("print", {
+        filepath: filename,
+        transfer_wait: true
+      })
+      .then(res => {
+        // emulate pressing the "start print" button
+        this.client.request("process_method", {
+          method: "build_plate_cleared"
+        })
+  
+        return this.client.request("put_init", {
+          block_size: 50000,
+          file_id: "1",
+          file_path: `/current_thing/${filename}`,
+          length: data.byteLength
+        })
+      })
+      .then(() => {
+        this.sendPrintPart(0)
+      })
+    })
+    // .then(res => {
+    //   this.client.conn.write(data, () => {
+    //     this.client.request("put_term", {
+    //       crc: crc.crc32(data),
+    //       file_id: "1",
+    //       length: data.length
+    //     })
+    //   })
+    // })
+  }
+
   printFile(file) {
     // TODO what's the max length of the file name?
     var filename = path.parse(file).base
@@ -320,41 +389,10 @@ class MakerbotRpcClient extends EventEmitter {
     // TODO handle errors in this promise
     return new Promise((resolve, reject) => {
       fs.readFile(file, (err, data) => {
-        this.client.request("print", {
-          filepath: filename,
-          transfer_wait: true
-        })
-        .then(res => {
-          // resolve the promise with the new print data
-          resolve(res)
-
-          // emulate pressing the "start print" button
-          this.client.request("process_method", {
-            method: "build_plate_cleared"
-          })
-
-          return this.client.request("put_init", {
-            block_size: data.length,
-            file_id: "1",
-            file_path: `/current_thing/${filename}`,
-            length: data.length
-          })
-        })
-        .then(res => {
-          return this.client.request("put_raw", {
-            file_id: "1",
-            length: data.length
-          })
-        })
-        .then(res => {
-          this.client.conn.write(data, () => {
-            this.client.request("put_term", {
-              crc: crc.crc32(data),
-              file_id: "1",
-              length: data.length
-            })
-          })
-        })
+        if(err)
+          reject(err)
+        else
+          resolve(this.initPrint(data, filename))
       })
     })
   }

@@ -12,6 +12,14 @@ printer.on("connected", printerInfo => {
   console.log(`Connected to ${printerInfo.machine_name}, attempting authentication`)
 })
 
+printer.on("timeout", () => {
+  console.log("Printer triggered timeout")
+})
+
+printer.on("disconnected", () => {
+  console.log("Printer disconnected :(")
+})
+
 printer.on("connect-error", err => {
   console.log("error connecting!", err)
 })
@@ -28,5 +36,5 @@ printer.on("authenticated", res => {
 printer.on("state", notif => {
   // console.log(`Got new printer state from ${notif.params.info.machine_name}`)
   // console.log(`Current temp: ${printer.state.toolheads.extruder[0].current_temperature} C`)
-  console.log(printer.state)
+  // console.log(printer.state)
 })

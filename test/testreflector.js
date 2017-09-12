@@ -5,13 +5,22 @@ const config = require('./reflectortestconfig.json')
 var printer = new MakerbotRpc({
   authMethod: "reflector",
   accessToken: config.accessToken,
-  printerId: config.printerId
+  printerId: config.printerId,
+  autoRescue: true
 })
 
 console.log(`Attempting to connect to ${config.printerId}...`)
 
 printer.on("connected", printerInfo => {
   console.log(`Connected to ${printerInfo.machine_name}, attempting authentication`)
+})
+
+printer.on("timeout", () => {
+  console.log("Printer triggered timeout")
+})
+
+printer.on("disconnected", () => {
+  console.log("Printer disconnected :(")
 })
 
 printer.on("connect-error", err => {
@@ -24,7 +33,7 @@ printer.on("auth-push-knob", () => {
 
 printer.on("authenticated", res => {
   console.log("Authenticated!")
-  // printer.printFile(__dirname + "/mei.makerbot")
+  printer.printFile("/Users/tj/Downloads/testprint.makerbot")
   // printer.startCameraStream()
   // printer.getSingleCameraFrame()
   //   .then(frame => {
@@ -42,5 +51,5 @@ printer.on("camera-frame", frame => {
 printer.on("state", notif => {
   // console.log(`Got new printer state from ${notif.params.info.machine_name}`)
   // console.log(`Current temp: ${printer.state.toolheads.extruder[0].current_temperature} C`)
-  console.log(printer.state)
+  // console.log(printer.state)
 })

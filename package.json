@@ -1,6 +1,6 @@
 {
   "name": "makerbot-rpc",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Interact with your MakerBot printers through node.js",
   "main": "index.js",
   "scripts": {
@@ -16,6 +16,7 @@
   "dependencies": {
     "crc": "^3.4.4",
     "makerbot": "^1.0.2",
+    "node-split": "^1.0.1",
     "request": "^2.81.0"
   }
 }
