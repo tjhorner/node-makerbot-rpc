@@ -26,6 +26,8 @@ class MakerbotRpcClient extends EventEmitter {
     this.currentPrintCrc32 = ""
     this.currentPrintByteLength = 0
     this._connect(options)
+
+    this.options = options
   }
 
   _connect(options) {
@@ -33,6 +35,15 @@ class MakerbotRpcClient extends EventEmitter {
       this._initReflector(options)
     else
       this._initLocal(options)
+  }
+
+  reconnect() {
+    this.client.conn.end()
+    this.client.conn.destroy()
+
+    this.connected = false
+    this.emit("disconnected")
+    this._connect(this.options)
   }
 
   _setupConnection(options) {
